@@ -1,0 +1,1981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Chess Arena</title>
+    <meta name="description" content="Watch two AI players powered by LLMs via OpenRouter battle it out in real-time chess. A cinematic digital tournament experience.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <style>
+        /* ========== RESET & BASE ========== */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary: #0D1117;
+            --bg-secondary: #161B22;
+            --bg-card: rgba(255, 255, 255, 0.04);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-accent: rgba(79, 142, 247, 0.3);
+            --accent: #4F8EF7;
+            --accent-glow: rgba(79, 142, 247, 0.4);
+            --accent-dim: rgba(79, 142, 247, 0.15);
+            --text-primary: #E6EDF3;
+            --text-secondary: #8B949E;
+            --text-muted: #484F58;
+            --white-piece: #FAFAFA;
+            --black-piece: #1C1C2E;
+            --sq-light-wood: #F0D9B5;
+            --sq-dark-wood: #B58863;
+            --sq-light-mono: #D0D0D0;
+            --sq-dark-mono: #606060;
+            --highlight-from: rgba(79, 142, 247, 0.55);
+            --highlight-to: rgba(79, 142, 247, 0.75);
+            --danger: #F85149;
+            --success: #3FB950;
+            --warning: #D29922;
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: var(--bg-primary);
+            background-image:
+                linear-gradient(rgba(79, 142, 247, 0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(79, 142, 247, 0.025) 1px, transparent 1px);
+            background-size: 48px 48px;
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ========== API KEY BAR ========== */
+        #api-bar {
+            background: linear-gradient(135deg, rgba(79, 142, 247, 0.08), rgba(79, 142, 247, 0.02));
+            border-bottom: 1px solid var(--border-accent);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            backdrop-filter: blur(12px);
+            position: relative;
+            z-index: 100;
+            transition: all 0.4s ease;
+        }
+
+        #api-bar.collapsed {
+            padding: 8px 24px;
+            background: rgba(79, 142, 247, 0.03);
+        }
+
+        #api-bar label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        #api-key-input {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 8px 14px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            width: 340px;
+            max-width: 50vw;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #api-key-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-dim);
+        }
+
+        #api-key-input::placeholder { color: var(--text-muted); }
+
+        #api-provider-select {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.82rem;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.3s;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238B949E' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 28px;
+        }
+
+        #api-provider-select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-dim);
+        }
+
+        #api-provider-select option {
+            background: #1C2128;
+            color: var(--text-primary);
+        }
+
+        .btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            font-size: 0.82rem;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 18px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-accent {
+            background: linear-gradient(135deg, var(--accent), #3A6FD8);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(79, 142, 247, 0.3);
+        }
+
+        .btn-accent:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(79, 142, 247, 0.4);
+        }
+
+        .btn-accent:active { transform: translateY(0); }
+
+        .btn-accent:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #api-status {
+            font-size: 0.78rem;
+            color: var(--success);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #api-status.visible { opacity: 1; }
+
+        /* ========== HEADER ========== */
+        header {
+            text-align: center;
+            padding: 28px 24px 8px;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #E6EDF3, var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+
+        header p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* ========== ARENA LAYOUT ========== */
+        #arena {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 28px;
+            padding: 20px 24px 0;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* ========== PLAYER CARDS ========== */
+        .player-card {
+            width: 220px;
+            min-width: 200px;
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 22px 18px;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.4s, box-shadow 0.4s;
+        }
+
+        .player-card.active-turn {
+            border-color: var(--accent);
+            box-shadow: 0 0 24px var(--accent-glow), inset 0 0 24px rgba(79, 142, 247, 0.04);
+        }
+
+        .player-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0;
+            transition: opacity 0.4s;
+        }
+
+        .player-card.active-turn::before { opacity: 1; }
+
+        .player-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            margin-bottom: 12px;
+        }
+
+        .player-avatar.white-avatar {
+            background: linear-gradient(135deg, #F0D9B5, #D4A76A);
+            color: #3D2B1F;
+        }
+
+        .player-avatar.black-avatar {
+            background: linear-gradient(135deg, #2D2D3F, #1C1C2E);
+            color: #E0E0E0;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .player-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .player-personality {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 14px;
+        }
+
+        /* Thinking indicator */
+        .thinking-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            height: 20px;
+        }
+
+        .thinking-indicator.visible { opacity: 1; }
+
+        .thinking-label {
+            font-size: 0.72rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .thinking-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .thinking-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: pulse 1.4s ease-in-out infinite;
+        }
+
+        .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+        .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.25; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+
+        /* Captured pieces */
+        .captured-section {
+            margin-bottom: 12px;
+        }
+
+        .captured-label {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .captured-pieces {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            min-height: 24px;
+            font-size: 1.1rem;
+            line-height: 1;
+        }
+
+        /* Invalid move counter */
+        .invalid-counter {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .invalid-count {
+            color: var(--danger);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+        }
+
+        /* Thought bubble */
+        .thought-bubble {
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            max-height: 60px;
+            overflow-y: auto;
+            word-break: break-all;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .thought-bubble.visible { opacity: 1; }
+
+        .thought-bubble-label {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        /* ========== MODEL CONFIG ========== */
+        #model-config {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 0 24px;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.5s ease, opacity 0.4s ease, padding 0.4s ease;
+        }
+
+        #model-config.visible {
+            max-height: 200px;
+            opacity: 1;
+            padding: 12px 24px 4px;
+        }
+
+        .model-config-inner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        .model-selector {
+            flex: 1;
+            max-width: 280px;
+        }
+
+        .model-selector label {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .model-selector select {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 9px 12px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.3s;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238B949E' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 28px;
+        }
+
+        .model-selector select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-dim);
+        }
+
+        .model-selector select option {
+            background: #1C2128;
+            color: var(--text-primary);
+        }
+
+        .model-config-vs {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            padding-top: 18px;
+            letter-spacing: 2px;
+        }
+
+        /* Player model name */
+        .player-model {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--accent);
+            margin-bottom: 8px;
+            padding: 3px 8px;
+            background: var(--accent-dim);
+            border-radius: 4px;
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .player-model.empty {
+            color: var(--text-muted);
+            background: rgba(255,255,255,0.03);
+        }
+
+        /* Confidence score */
+        .confidence-section {
+            margin-bottom: 14px;
+        }
+
+        .confidence-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .confidence-label {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .confidence-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: color 0.4s;
+        }
+
+        .confidence-value.high { color: var(--success); }
+        .confidence-value.mid { color: var(--warning); }
+        .confidence-value.low { color: var(--danger); }
+
+        .confidence-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, var(--danger), var(--warning), var(--success));
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .confidence-fill::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent 60%, rgba(255,255,255,0.15));
+            border-radius: 3px;
+        }
+
+        /* ========== BOARD SECTION ========== */
+        #board-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Status banner */
+        #status-banner {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 8px 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-align: center;
+            min-width: 260px;
+            transition: all 0.3s;
+        }
+
+        #status-banner.check {
+            color: var(--warning);
+            border-color: rgba(210, 153, 34, 0.4);
+            background: rgba(210, 153, 34, 0.08);
+        }
+
+        #status-banner.checkmate {
+            color: var(--danger);
+            border-color: rgba(248, 81, 73, 0.4);
+            background: rgba(248, 81, 73, 0.08);
+        }
+
+        /* Board wrapper with coordinate labels */
+        #board-wrapper {
+            display: grid;
+            grid-template-columns: 20px 1fr;
+            grid-template-rows: 1fr 20px;
+            gap: 0;
+        }
+
+        #rank-labels {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            padding-right: 4px;
+        }
+
+        #rank-labels span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-align: center;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #file-labels {
+            display: flex;
+            justify-content: space-around;
+            padding-top: 4px;
+            grid-column: 2;
+        }
+
+        #file-labels span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            width: 60px;
+            text-align: center;
+        }
+
+        /* Chess board */
+        #chess-board {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            border: 2px solid var(--border-accent);
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow:
+                0 0 40px rgba(79, 142, 247, 0.08),
+                0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .square {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.6rem;
+            user-select: none;
+            position: relative;
+            transition: background-color 0.25s ease;
+            cursor: default;
+        }
+
+        /* Wood theme */
+        .theme-wood .square.light { background: var(--sq-light-wood); }
+        .theme-wood .square.dark { background: var(--sq-dark-wood); }
+
+        /* Mono theme */
+        .theme-mono .square.light { background: var(--sq-light-mono); }
+        .theme-mono .square.dark { background: var(--sq-dark-mono); }
+
+        /* Move highlights */
+        .square.highlight-from {
+            background: var(--highlight-from) !important;
+        }
+
+        .square.highlight-to {
+            background: var(--highlight-to) !important;
+            box-shadow: inset 0 0 12px rgba(79, 142, 247, 0.3);
+        }
+
+        /* Piece styling */
+        .piece {
+            line-height: 1;
+            filter: drop-shadow(1px 2px 2px rgba(0, 0, 0, 0.35));
+            transition: transform 0.15s ease;
+            pointer-events: none;
+        }
+
+        .piece-w {
+            color: var(--white-piece);
+            text-shadow:
+                0 0 1px rgba(0,0,0,0.6),
+                0 1px 3px rgba(0,0,0,0.4);
+        }
+
+        .piece-b {
+            color: var(--black-piece);
+            text-shadow:
+                0 0 1px rgba(255,255,255,0.15),
+                0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* Board theme toggle */
+        #theme-toggle {
+            margin-top: 10px;
+        }
+
+        #theme-toggle .btn {
+            font-size: 0.7rem;
+            padding: 5px 12px;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-subtle);
+        }
+
+        #theme-toggle .btn:hover {
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
+
+        /* ========== CONTROLS ========== */
+        #controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 18px 24px;
+            max-width: 1000px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+        }
+
+        .btn-control {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-subtle);
+            padding: 10px 22px;
+            font-size: 0.82rem;
+        }
+
+        .btn-control:hover {
+            border-color: var(--accent);
+            background: var(--accent-dim);
+        }
+
+        .btn-control:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .btn-control:disabled:hover {
+            border-color: var(--border-subtle);
+            background: var(--bg-card);
+        }
+
+        .btn-control.btn-start {
+            background: linear-gradient(135deg, rgba(63, 185, 80, 0.15), rgba(63, 185, 80, 0.05));
+            border-color: rgba(63, 185, 80, 0.3);
+            color: var(--success);
+        }
+
+        .btn-control.btn-start:hover {
+            background: rgba(63, 185, 80, 0.2);
+            border-color: var(--success);
+        }
+
+        .btn-control.btn-reset {
+            color: var(--danger);
+            border-color: rgba(248, 81, 73, 0.2);
+        }
+
+        .btn-control.btn-reset:hover {
+            background: rgba(248, 81, 73, 0.1);
+            border-color: var(--danger);
+        }
+
+        #speed-control {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 3px;
+            margin-left: 6px;
+        }
+
+        #speed-control .speed-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            padding: 0 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-speed {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            font-size: 0.72rem;
+            border: none;
+            border-radius: 6px;
+            padding: 7px 14px;
+            cursor: pointer;
+            background: transparent;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .btn-speed:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-speed.active {
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(79, 142, 247, 0.3);
+        }
+
+        /* ========== MOVE HISTORY ========== */
+        #move-history {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 0 24px 32px;
+        }
+
+        #move-history h3 {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        #move-list {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--text-muted) transparent;
+        }
+
+        #move-list::-webkit-scrollbar { width: 6px; }
+        #move-list::-webkit-scrollbar-track { background: transparent; }
+        #move-list::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 3px;
+        }
+
+        .move-row {
+            display: grid;
+            grid-template-columns: 48px 1fr 1fr;
+            padding: 6px 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            align-items: center;
+        }
+
+        .move-row:nth-child(even) {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .move-num {
+            color: var(--text-muted);
+            font-size: 0.72rem;
+        }
+
+        .move-white, .move-black {
+            padding: 2px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .move-white { color: #E8D5B7; }
+        .move-black { color: #9BA3AD; }
+
+        .move-latest {
+            background: var(--accent-dim);
+            color: var(--accent) !important;
+        }
+
+        .move-placeholder {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* ========== RESULT OVERLAY ========== */
+        #result-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(13, 17, 23, 0.88);
+            backdrop-filter: blur(12px);
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        #result-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        #result-content {
+            background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+            border: 1px solid var(--border-accent);
+            border-radius: 24px;
+            padding: 48px 64px;
+            text-align: center;
+            transform: scale(0.85) translateY(20px);
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+        }
+
+        #result-overlay.visible #result-content {
+            transform: scale(1) translateY(0);
+        }
+
+        #result-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+
+        #result-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        #result-detail {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 28px;
+        }
+
+        .btn-play-again {
+            padding: 14px 36px;
+            font-size: 1rem;
+        }
+
+        /* ========== ANIMATIONS ========== */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 20px var(--accent-glow); }
+            50% { box-shadow: 0 0 40px var(--accent-glow), 0 0 60px rgba(79,142,247,0.15); }
+        }
+
+        .animate-in { animation: fadeInUp 0.5s ease forwards; }
+
+        /* ========== RESPONSIVE ========== */
+        @media (max-width: 960px) {
+            #arena {
+                flex-direction: column;
+                align-items: center;
+                gap: 16px;
+            }
+            .player-card {
+                width: 100%;
+                max-width: 480px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                padding: 14px 18px;
+            }
+            .player-card > * { flex-shrink: 0; }
+            .thought-bubble { flex-basis: 100%; }
+        }
+
+        @media (max-width: 560px) {
+            #chess-board {
+                grid-template-columns: repeat(8, 44px);
+                grid-template-rows: repeat(8, 44px);
+            }
+            .square { width: 44px; height: 44px; font-size: 1.9rem; }
+            #rank-labels span { height: 44px; }
+            #file-labels span { width: 44px; }
+            #controls { gap: 6px; }
+            .btn-control { padding: 8px 14px; font-size: 0.75rem; }
+        }
+
+        /* ========== SCROLLBAR GLOBAL ========== */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #30363D; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <!-- API Key Bar -->
+    <div id="api-bar">
+        <label for="api-provider-select">🔌 Provider</label>
+        <select id="api-provider-select" onchange="changeProvider()">
+            <option value="openrouter">OpenRouter</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="gemini">Google Gemini</option>
+        </select>
+        <label for="api-key-input">🔑 API Key</label>
+        <input type="password" id="api-key-input" placeholder="Enter API key..." autocomplete="off" oninput="detectProvider()">
+        <button class="btn btn-accent" id="btn-save-key" onclick="saveApiKey()">Save</button>
+        <span id="api-status">✓ Key saved</span>
+    </div>
+
+    <!-- Model Config -->
+    <div id="model-config">
+        <div class="model-config-inner">
+            <div class="model-selector">
+                <label for="white-model-select">⬜ White Model</label>
+                <select id="white-model-select" onchange="selectModel('w')">
+                    <option value="">— Save API key first —</option>
+                </select>
+            </div>
+            <div class="model-config-vs">VS</div>
+            <div class="model-selector">
+                <label for="black-model-select">⬛ Black Model</label>
+                <select id="black-model-select" onchange="selectModel('b')">
+                    <option value="">— Save API key first —</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header>
+        <h1>⚔ LLM Chess Arena</h1>
+        <p>Two AI minds. One board. No mercy.</p>
+    </header>
+
+    <!-- Arena -->
+    <div id="arena">
+
+        <!-- White Player Card -->
+        <div class="player-card" id="white-card">
+            <div class="player-avatar white-avatar">♔</div>
+            <div class="player-name">White</div>
+            <div class="player-model empty" id="white-model-display">No model selected</div>
+            <div class="player-personality">AI Chess Player</div>
+            <div class="thinking-indicator" id="white-thinking">
+                <span class="thinking-label">Thinking</span>
+                <div class="thinking-dots">
+                    <span class="thinking-dot"></span>
+                    <span class="thinking-dot"></span>
+                    <span class="thinking-dot"></span>
+                </div>
+            </div>
+            <div class="confidence-section">
+                <div class="confidence-header">
+                    <span class="confidence-label">Win Confidence</span>
+                    <span class="confidence-value" id="white-confidence">—</span>
+                </div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" id="white-confidence-fill"></div>
+                </div>
+            </div>
+            <div class="captured-section">
+                <div class="captured-label">Captured</div>
+                <div class="captured-pieces" id="white-captures">—</div>
+            </div>
+            <div class="invalid-counter">
+                <span>Invalid moves:</span>
+                <span class="invalid-count" id="white-invalid">0</span>
+            </div>
+            <div class="thought-bubble-label">Last AI response</div>
+            <div class="thought-bubble" id="white-thought">—</div>
+        </div>
+
+        <!-- Board Section -->
+        <div id="board-section">
+            <div id="status-banner">Press Start to begin the match</div>
+            <div id="board-wrapper" class="theme-wood">
+                <div id="rank-labels">
+                    <span>8</span><span>7</span><span>6</span><span>5</span>
+                    <span>4</span><span>3</span><span>2</span><span>1</span>
+                </div>
+                <div id="chess-board"></div>
+                <div id="file-labels">
+                    <span>a</span><span>b</span><span>c</span><span>d</span>
+                    <span>e</span><span>f</span><span>g</span><span>h</span>
+                </div>
+            </div>
+            <div id="theme-toggle">
+                <button class="btn" onclick="toggleTheme()">🎨 Toggle Board Theme</button>
+            </div>
+        </div>
+
+        <!-- Black Player Card -->
+        <div class="player-card" id="black-card">
+            <div class="player-avatar black-avatar">♚</div>
+            <div class="player-name">Black</div>
+            <div class="player-model empty" id="black-model-display">No model selected</div>
+            <div class="player-personality">AI Chess Player</div>
+            <div class="thinking-indicator" id="black-thinking">
+                <span class="thinking-label">Thinking</span>
+                <div class="thinking-dots">
+                    <span class="thinking-dot"></span>
+                    <span class="thinking-dot"></span>
+                    <span class="thinking-dot"></span>
+                </div>
+            </div>
+            <div class="confidence-section">
+                <div class="confidence-header">
+                    <span class="confidence-label">Win Confidence</span>
+                    <span class="confidence-value" id="black-confidence">—</span>
+                </div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" id="black-confidence-fill"></div>
+                </div>
+            </div>
+            <div class="captured-section">
+                <div class="captured-label">Captured</div>
+                <div class="captured-pieces" id="black-captures">—</div>
+            </div>
+            <div class="invalid-counter">
+                <span>Invalid moves:</span>
+                <span class="invalid-count" id="black-invalid">0</span>
+            </div>
+            <div class="thought-bubble-label">Last AI response</div>
+            <div class="thought-bubble" id="black-thought">—</div>
+        </div>
+
+    </div>
+
+    <!-- Controls -->
+    <div id="controls">
+        <button class="btn btn-control btn-start" id="btn-start" onclick="startGame()">▶ Start</button>
+        <button class="btn btn-control" id="btn-pause" onclick="pauseGame()" disabled>⏸ Pause</button>
+        <button class="btn btn-control btn-reset" id="btn-reset" onclick="resetGame()">↺ Reset</button>
+        <div id="speed-control">
+            <span class="speed-label">Speed</span>
+            <button class="btn-speed" data-speed="3000" onclick="setSpeed(3000, this)">Slow</button>
+            <button class="btn-speed active" data-speed="1500" onclick="setSpeed(1500, this)">Normal</button>
+            <button class="btn-speed" data-speed="500" onclick="setSpeed(500, this)">Fast</button>
+        </div>
+    </div>
+
+    <!-- Move History -->
+    <div id="move-history">
+        <h3>Move History</h3>
+        <div id="move-list">
+            <div class="move-placeholder">No moves yet. Start the match!</div>
+        </div>
+    </div>
+
+    <!-- Result Overlay -->
+    <div id="result-overlay">
+        <div id="result-content">
+            <div id="result-icon"></div>
+            <h2 id="result-title"></h2>
+            <p id="result-detail"></p>
+            <button class="btn btn-accent btn-play-again" onclick="playAgain()">⟳ Play Again</button>
+        </div>
+    </div>
+
+    <script>
+    /* ==========================================================================
+       LLM Chess Arena — Game Logic
+       ========================================================================== */
+
+    // ── Unicode piece map ──
+    const PIECE_UNICODE = {
+        w: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
+        b: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' }
+    };
+
+    // ── Piece material values (for captured sort) ──
+    const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+
+    // ── State ──
+    let game = new Chess();
+    let isPlaying = false;
+    let isPaused = false;
+    let speed = 1500;
+    let apiKey = '';
+    let gameLoopTimer = null;
+    let boardTheme = 'wood';      // 'wood' | 'mono'
+    let invalidMoves = { w: 0, b: 0 };
+    let lastResponse = { w: '', b: '' };
+    let capturedBy = { w: [], b: [] };  // pieces captured BY each color
+    let lastMoveSquares = { from: null, to: null };
+    let whiteModel = '';
+    let blackModel = '';
+    let availableModels = [];
+    let confidence = { w: null, b: null };
+    let apiProvider = 'openrouter';
+
+    // ── Initialise ──
+    document.addEventListener('DOMContentLoaded', () => {
+        // Restore Provider
+        const storedProvider = sessionStorage.getItem('api_provider');
+        if (storedProvider) {
+            apiProvider = storedProvider;
+            document.getElementById('api-provider-select').value = apiProvider;
+        }
+
+        // Restore API key
+        const stored = sessionStorage.getItem('api_key');
+        if (stored) {
+            apiKey = stored;
+            document.getElementById('api-key-input').value = stored;
+            showApiStatus();
+            fetchModels();
+        }
+        // Restore model selections
+        const storedWM = sessionStorage.getItem('white_model');
+        const storedBM = sessionStorage.getItem('black_model');
+        if (storedWM) whiteModel = storedWM;
+        if (storedBM) blackModel = storedBM;
+        createBoard();
+        renderBoard();
+    });
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // API KEY
+    // ────────────────────────────────────────────────────────────────────────────
+    function saveApiKey() {
+        const input = document.getElementById('api-key-input');
+        const providerSelect = document.getElementById('api-provider-select');
+        const key = input.value.trim();
+        if (!key) return;
+        apiKey = key;
+        apiProvider = providerSelect.value;
+        sessionStorage.setItem('api_key', key);
+        sessionStorage.setItem('api_provider', apiProvider);
+        showApiStatus();
+        fetchModels();
+    }
+
+    function changeProvider() {
+        apiProvider = document.getElementById('api-provider-select').value;
+        sessionStorage.setItem('api_provider', apiProvider);
+        if (apiKey) {
+            fetchModels();
+        }
+    }
+
+    function detectProvider() {
+        const key = document.getElementById('api-key-input').value.trim();
+        const select = document.getElementById('api-provider-select');
+        if (key.startsWith('sk-or-')) {
+            select.value = 'openrouter';
+        } else if (key.startsWith('sk-proj-') || (key.startsWith('sk-') && !key.startsWith('sk-ant-'))) {
+            select.value = 'openai';
+        } else if (key.startsWith('sk-ant-')) {
+            select.value = 'anthropic';
+        } else if (key.startsWith('AIzaSy')) {
+            select.value = 'gemini';
+        }
+        apiProvider = select.value;
+    }
+
+    function showApiStatus() {
+        const el = document.getElementById('api-status');
+        el.classList.add('visible');
+        document.getElementById('api-bar').classList.add('collapsed');
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // MODEL FETCHING & SELECTION
+    // ────────────────────────────────────────────────────────────────────────────
+    async function fetchModels() {
+        const whiteSelect = document.getElementById('white-model-select');
+        const blackSelect = document.getElementById('black-model-select');
+        whiteSelect.innerHTML = '<option value="">⏳ Loading models...</option>';
+        blackSelect.innerHTML = '<option value="">⏳ Loading models...</option>';
+        document.getElementById('model-config').classList.add('visible');
+
+        if (apiProvider === 'anthropic') {
+            // Anthropic doesn't support CORS model listing, pre-populate major chat models
+            availableModels = [
+                { id: 'claude-3-7-sonnet-latest', name: 'Claude 3.7 Sonnet' },
+                { id: 'claude-3-5-sonnet-latest', name: 'Claude 3.5 Sonnet' },
+                { id: 'claude-3-5-haiku-latest', name: 'Claude 3.5 Haiku' },
+                { id: 'claude-3-opus-latest', name: 'Claude 3 Opus' }
+            ];
+            populateModelDropdowns();
+            return;
+        }
+
+        try {
+            let url = '';
+            let headers = {};
+
+            if (apiProvider === 'openrouter') {
+                url = 'https://openrouter.ai/api/v1/models';
+                headers = { 'Authorization': `Bearer ${apiKey}` };
+            } else if (apiProvider === 'openai') {
+                url = 'https://api.openai.com/v1/models';
+                headers = { 'Authorization': `Bearer ${apiKey}` };
+            } else if (apiProvider === 'gemini') {
+                url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+            }
+
+            const response = await fetch(url, { headers });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (apiProvider === 'openrouter') {
+                availableModels = (data.data || [])
+                    .filter(m => m.id && m.name)
+                    .sort((a, b) => a.name.localeCompare(b.name));
+            } else if (apiProvider === 'openai') {
+                availableModels = (data.data || [])
+                    .filter(m => {
+                        const id = m.id;
+                        // Keep only chess-viable chat/reasoning models
+                        return id.startsWith('gpt-4') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('chatgpt-4');
+                    })
+                    .map(m => ({ id: m.id, name: m.id }))
+                    .sort((a, b) => a.name.localeCompare(b.name));
+            } else if (apiProvider === 'gemini') {
+                availableModels = (data.models || [])
+                    .filter(m => {
+                        const name = m.name || '';
+                        return name.includes('gemini-');
+                    })
+                    .map(m => {
+                        const cleanId = m.name.replace(/^models\//, '');
+                        return { id: cleanId, name: m.displayName || cleanId };
+                    })
+                    .sort((a, b) => a.name.localeCompare(b.name));
+            }
+
+            populateModelDropdowns();
+        } catch (err) {
+            console.error('Failed to fetch models:', err);
+            whiteSelect.innerHTML = '<option value="">❌ Failed to load</option>';
+            blackSelect.innerHTML = '<option value="">❌ Failed to load</option>';
+        }
+    }
+
+    function populateModelDropdowns() {
+        const whiteSelect = document.getElementById('white-model-select');
+        const blackSelect = document.getElementById('black-model-select');
+
+        const optionsHtml = '<option value="">— Choose a model —</option>' +
+            availableModels.map(m =>
+                `<option value="${m.id}">${m.name}</option>`
+            ).join('');
+
+        whiteSelect.innerHTML = optionsHtml;
+        blackSelect.innerHTML = optionsHtml;
+
+        // Restore previous selections if available
+        if (whiteModel && availableModels.some(m => m.id === whiteModel)) {
+            whiteSelect.value = whiteModel;
+            updateModelDisplay('w');
+        }
+        if (blackModel && availableModels.some(m => m.id === blackModel)) {
+            blackSelect.value = blackModel;
+            updateModelDisplay('b');
+        }
+    }
+
+    function selectModel(color) {
+        const selectId = color === 'w' ? 'white-model-select' : 'black-model-select';
+        const modelId = document.getElementById(selectId).value;
+
+        if (color === 'w') {
+            whiteModel = modelId;
+            sessionStorage.setItem('white_model', modelId);
+        } else {
+            blackModel = modelId;
+            sessionStorage.setItem('black_model', modelId);
+        }
+        updateModelDisplay(color);
+    }
+
+    function updateModelDisplay(color) {
+        const displayId = color === 'w' ? 'white-model-display' : 'black-model-display';
+        const modelId = color === 'w' ? whiteModel : blackModel;
+        const el = document.getElementById(displayId);
+
+        if (modelId) {
+            const model = availableModels.find(m => m.id === modelId);
+            // Show a short readable name (strip the provider prefix for display)
+            const shortName = model ? model.name : modelId;
+            el.textContent = shortName;
+            el.classList.remove('empty');
+        } else {
+            el.textContent = 'No model selected';
+            el.classList.add('empty');
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // BOARD RENDERING
+    // ────────────────────────────────────────────────────────────────────────────
+    function createBoard() {
+        const board = document.getElementById('chess-board');
+        board.innerHTML = '';
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                const sq = document.createElement('div');
+                const isLight = (row + col) % 2 === 0;
+                sq.className = `square ${isLight ? 'light' : 'dark'}`;
+                sq.dataset.row = row;
+                sq.dataset.col = col;
+                // algebraic id: col=0 -> 'a', row=0 -> rank 8
+                const file = String.fromCharCode(97 + col);
+                const rank = 8 - row;
+                sq.dataset.square = file + rank;
+                board.appendChild(sq);
+            }
+        }
+    }
+
+    function renderBoard() {
+        const boardState = game.board();
+        const squares = document.querySelectorAll('.square');
+
+        squares.forEach(sq => {
+            const row = parseInt(sq.dataset.row);
+            const col = parseInt(sq.dataset.col);
+            const cell = boardState[row][col];
+
+            // Clear previous
+            sq.innerHTML = '';
+            sq.classList.remove('highlight-from', 'highlight-to');
+
+            // Highlight last move
+            const sqName = sq.dataset.square;
+            if (lastMoveSquares.from === sqName) sq.classList.add('highlight-from');
+            if (lastMoveSquares.to === sqName) sq.classList.add('highlight-to');
+
+            // Place piece
+            if (cell) {
+                const span = document.createElement('span');
+                span.className = `piece piece-${cell.color}`;
+                span.textContent = PIECE_UNICODE[cell.color][cell.type];
+                sq.appendChild(span);
+            }
+        });
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // BOARD THEME
+    // ────────────────────────────────────────────────────────────────────────────
+    function toggleTheme() {
+        const wrapper = document.getElementById('board-wrapper');
+        if (boardTheme === 'wood') {
+            boardTheme = 'mono';
+            wrapper.classList.remove('theme-wood');
+            wrapper.classList.add('theme-mono');
+        } else {
+            boardTheme = 'wood';
+            wrapper.classList.remove('theme-mono');
+            wrapper.classList.add('theme-wood');
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // GAME CONTROLS
+    // ────────────────────────────────────────────────────────────────────────────
+    function startGame() {
+        if (!apiKey) {
+            setStatus('⚠ Enter your OpenRouter API key first', 'check');
+            document.getElementById('api-key-input').focus();
+            return;
+        }
+        if (!whiteModel || !blackModel) {
+            setStatus('⚠ Select a model for both White and Black', 'check');
+            return;
+        }
+        if (game.game_over()) resetGame();
+
+        isPlaying = true;
+        isPaused = false;
+        document.getElementById('btn-start').disabled = true;
+        document.getElementById('btn-pause').disabled = false;
+        document.getElementById('btn-pause').textContent = '⏸ Pause';
+
+        gameLoop();
+    }
+
+    function pauseGame() {
+        if (!isPlaying) return;
+        isPaused = !isPaused;
+
+        const btn = document.getElementById('btn-pause');
+        if (isPaused) {
+            btn.textContent = '▶ Resume';
+            clearTimeout(gameLoopTimer);
+            setStatus('⏸ Game paused');
+            hideThinking();
+        } else {
+            btn.textContent = '⏸ Pause';
+            gameLoop();
+        }
+    }
+
+    function resetGame() {
+        isPlaying = false;
+        isPaused = false;
+        clearTimeout(gameLoopTimer);
+
+        game = new Chess();
+        invalidMoves = { w: 0, b: 0 };
+        lastResponse = { w: '', b: '' };
+        capturedBy = { w: [], b: [] };
+        lastMoveSquares = { from: null, to: null };
+        confidence = { w: null, b: null };
+
+        renderBoard();
+        updateMoveHistory();
+        updateCaptured();
+        updateInvalidCounts();
+        hideThinking();
+        updateConfidence('w', null);
+        updateConfidence('b', null);
+        setStatus('Press Start to begin the match');
+        updateActiveCard();
+
+        document.getElementById('btn-start').disabled = false;
+        document.getElementById('btn-pause').disabled = true;
+        document.getElementById('btn-pause').textContent = '⏸ Pause';
+
+        document.getElementById('white-thought').textContent = '—';
+        document.getElementById('white-thought').classList.remove('visible');
+        document.getElementById('black-thought').textContent = '—';
+        document.getElementById('black-thought').classList.remove('visible');
+    }
+
+    function playAgain() {
+        document.getElementById('result-overlay').classList.remove('visible');
+        resetGame();
+    }
+
+    function setSpeed(ms, btnEl) {
+        speed = ms;
+        document.querySelectorAll('.btn-speed').forEach(b => b.classList.remove('active'));
+        if (btnEl) btnEl.classList.add('active');
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // GAME LOOP
+    // ────────────────────────────────────────────────────────────────────────────
+    async function gameLoop() {
+        if (!isPlaying || isPaused || game.game_over()) return;
+
+        const turn = game.turn();
+        const colorName = turn === 'w' ? 'White' : 'Black';
+
+        setStatus(`${colorName} is thinking...`);
+        showThinking(turn);
+        updateActiveCard();
+
+        try {
+            const moveSan = await getAIMove(turn);
+
+            if (!isPlaying || isPaused) return; // user paused/reset during API call
+
+            // Apply move
+            const result = game.move(moveSan);
+            if (result) {
+                // Track captured piece
+                if (result.captured) {
+                    capturedBy[turn].push(result.captured);
+                }
+                lastMoveSquares = { from: result.from, to: result.to };
+            }
+
+            renderBoard();
+            updateMoveHistory();
+            updateCaptured();
+            updateInvalidCounts();
+            hideThinking();
+            updateActiveCard();
+
+            // Check game over
+            if (game.game_over()) {
+                isPlaying = false;
+                showGameResult();
+                return;
+            }
+
+            // Check status
+            if (game.in_check()) {
+                setStatus('♚ Check!', 'check');
+            } else {
+                const nextColor = game.turn() === 'w' ? 'White' : 'Black';
+                setStatus(`${nextColor} to move`);
+            }
+
+        } catch (err) {
+            console.error('Game loop error:', err);
+            hideThinking();
+            setStatus(`Error: ${err.message}`, 'check');
+        }
+
+        // Schedule next turn
+        if (isPlaying && !isPaused && !game.game_over()) {
+            gameLoopTimer = setTimeout(gameLoop, speed);
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // AI MOVE (OPENROUTER API)
+    // ────────────────────────────────────────────────────────────────────────────
+    async function getAIMove(color) {
+        const fen = game.fen();
+        const history = game.history();
+        const historyStr = history.length > 0 ? history.join(' ') : 'None yet (first move)';
+        const legalMoves = game.moves();
+        const legalMovesStr = legalMoves.join(', ');
+
+        const colorName = color === 'w' ? 'White' : 'Black';
+        const selectedModel = color === 'w' ? whiteModel : blackModel;
+
+        const systemPrompt = `You are playing chess as ${colorName}. Respond with ONLY your next move in standard algebraic notation (like e4, Nf3, O-O, Bxc6). One move, nothing else.`;
+
+        let errorContext = '';
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                let url = '';
+                let headers = { 'Content-Type': 'application/json' };
+                let body = {};
+
+                if (apiProvider === 'openrouter') {
+                    url = 'https://openrouter.ai/api/v1/chat/completions';
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                    body = {
+                        model: selectedModel,
+                        max_tokens: 50,
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: `${errorContext}FEN: ${fen}\nLegal moves: ${legalMovesStr}\nYour move:` }
+                        ]
+                    };
+                } else if (apiProvider === 'openai') {
+                    url = 'https://api.openai.com/v1/chat/completions';
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                    body = {
+                        model: selectedModel,
+                        max_tokens: 50,
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: `${errorContext}FEN: ${fen}\nLegal moves: ${legalMovesStr}\nYour move:` }
+                        ]
+                    };
+                } else if (apiProvider === 'gemini') {
+                    url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+                    headers = { 'Content-Type': 'application/json' };
+                    body = {
+                        contents: [
+                            {
+                                role: 'user',
+                                parts: [
+                                    { text: `${systemPrompt}\n\n${errorContext}FEN: ${fen}\nLegal moves: ${legalMovesStr}\nYour move:` }
+                                ]
+                            }
+                        ],
+                        generationConfig: {
+                            maxOutputTokens: 50,
+                            temperature: 0.0
+                        }
+                    };
+                } else if (apiProvider === 'anthropic') {
+                    url = 'https://api.anthropic.com/v1/messages';
+                    headers['x-api-key'] = apiKey;
+                    headers['anthropic-version'] = '2023-06-01';
+                    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+                    body = {
+                        model: selectedModel,
+                        max_tokens: 50,
+                        system: systemPrompt,
+                        messages: [
+                            { role: 'user', content: `${errorContext}FEN: ${fen}\nLegal moves: ${legalMovesStr}\nYour move:` }
+                        ]
+                    };
+                }
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(body)
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    const errMsg = errData.error?.message || `HTTP ${response.status}`;
+                    updateThoughtBubble(color, `[API error: ${errMsg}]`);
+                    throw new Error(errMsg);
+                }
+
+                const data = await response.json();
+                
+                let rawText = '';
+                if (apiProvider === 'anthropic') {
+                    rawText = (data.content?.[0]?.text || data.completion || '').trim();
+                } else if (apiProvider === 'gemini') {
+                    rawText = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+                } else {
+                    rawText = (data.choices?.[0]?.message?.content || '').trim();
+                }
+
+                if (!rawText) {
+                    updateThoughtBubble(color, '[Empty response from model]');
+                    throw new Error('Empty response');
+                }
+
+                // Store raw response for thought bubble
+                lastResponse[color] = rawText;
+                updateThoughtBubble(color, rawText);
+
+                // Strategy 1: Try the raw text directly as a move
+                const validated = validateMove(rawText);
+                if (validated) {
+                    updateConfidence(color, estimateConfidence(color));
+                    return validated;
+                }
+
+                // Strategy 2: If response has pipe, try the part before it
+                if (rawText.includes('|')) {
+                    const beforePipe = rawText.split('|')[0].trim();
+                    const pipeMove = validateMove(beforePipe);
+                    if (pipeMove) {
+                        updateConfidence(color, estimateConfidence(color));
+                        return pipeMove;
+                    }
+                }
+
+                // Strategy 3: Try each word in the response individually
+                const words = rawText.replace(/[.,!?;:()]/g, ' ').split(/\s+/);
+                for (const word of words) {
+                    const wordMove = validateMove(word);
+                    if (wordMove) {
+                        updateConfidence(color, estimateConfidence(color));
+                        return wordMove;
+                    }
+                }
+
+                // Strategy 4: Search for any legal move string in the text
+                const extracted = extractMove(rawText, legalMoves);
+                if (extracted) {
+                    updateConfidence(color, estimateConfidence(color));
+                    return extracted;
+                }
+
+                // All strategies failed → invalid move
+                invalidMoves[color]++;
+                updateInvalidCounts();
+                errorContext = `"${rawText}" is invalid. Reply with ONLY one move from: ${legalMovesStr}\n`;
+
+            } catch (err) {
+                console.error(`[${colorName}] Attempt ${attempt + 1}/3 failed:`, err.message);
+                if (attempt === 2) {
+                    invalidMoves[color]++;
+                    updateInvalidCounts();
+                }
+                errorContext = `Pick one legal move from: ${legalMovesStr}\n`;
+            }
+        }
+
+        // Fallback: random legal move
+        const randomMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+        updateThoughtBubble(color, `[fallback → ${randomMove}]`);
+        updateConfidence(color, estimateConfidence(color));
+        return randomMove;
+    }
+
+    function validateMove(moveStr) {
+        // strip leading move number (e.g. "12. Nf3")
+        const noNumber = moveStr.replace(/^\d+\.?\s*/, '');
+        // strip only trailing punctuation, not internal hyphens for castling
+        const cleaned = noNumber.replace(/[\.,!?;:]+$/g, '').trim();
+        
+        // try SAN move with chess.js (which natively parses sloppy moves)
+        let result = game.move(cleaned, { sloppy: true });
+        if (result) {
+            game.undo();
+            return result.san;
+        }
+        // fallback to raw trimmed
+        result = game.move(moveStr.trim(), { sloppy: true });
+        if (result) {
+            game.undo();
+            return result.san;
+        }
+        return null;
+    }
+
+    function extractMove(text, legalMoves) {
+        // Sort moves by length descending to match longer moves first
+        // e.g., "Nxe5+" should match before "e5"
+        const sorted = [...legalMoves].sort((a, b) => b.length - a.length);
+
+        for (const move of sorted) {
+            // Use word boundary-like matching
+            if (text.includes(move)) {
+                // Verify it's actually valid
+                const result = game.move(move);
+                if (result) {
+                    game.undo();
+                    return result.san;
+                }
+            }
+        }
+        return null;
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // UI UPDATES
+    // ────────────────────────────────────────────────────────────────────────────
+    function setStatus(text, type) {
+        const banner = document.getElementById('status-banner');
+        banner.textContent = text;
+        banner.className = '';
+        if (type) banner.classList.add(type);
+    }
+
+    function showThinking(color) {
+        const id = color === 'w' ? 'white-thinking' : 'black-thinking';
+        document.getElementById(id).classList.add('visible');
+    }
+
+    function hideThinking() {
+        document.getElementById('white-thinking').classList.remove('visible');
+        document.getElementById('black-thinking').classList.remove('visible');
+    }
+
+    function updateActiveCard() {
+        const turn = game.turn();
+        document.getElementById('white-card').classList.toggle('active-turn', turn === 'w' && isPlaying);
+        document.getElementById('black-card').classList.toggle('active-turn', turn === 'b' && isPlaying);
+    }
+
+    function updateMoveHistory() {
+        const history = game.history();
+        const container = document.getElementById('move-list');
+
+        if (history.length === 0) {
+            container.innerHTML = '<div class="move-placeholder">No moves yet. Start the match!</div>';
+            return;
+        }
+
+        let html = '';
+        for (let i = 0; i < history.length; i += 2) {
+            const moveNum = Math.floor(i / 2) + 1;
+            const whiteMove = history[i];
+            const blackMove = history[i + 1] || '';
+            const isLatestWhite = i === history.length - 1;
+            const isLatestBlack = i + 1 === history.length - 1;
+
+            html += `<div class="move-row">
+                <span class="move-num">${moveNum}.</span>
+                <span class="move-white${isLatestWhite ? ' move-latest' : ''}">${whiteMove}</span>
+                <span class="move-black${isLatestBlack ? ' move-latest' : ''}">${blackMove}</span>
+            </div>`;
+        }
+        container.innerHTML = html;
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function updateCaptured() {
+        // White's captures (black pieces captured by white)
+        const wCaptures = capturedBy.w.sort((a, b) => PIECE_VALUE[b] - PIECE_VALUE[a]);
+        const bCaptures = capturedBy.b.sort((a, b) => PIECE_VALUE[b] - PIECE_VALUE[a]);
+
+        const wEl = document.getElementById('white-captures');
+        const bEl = document.getElementById('black-captures');
+
+        wEl.textContent = wCaptures.length > 0
+            ? wCaptures.map(p => PIECE_UNICODE.b[p]).join(' ')
+            : '—';
+        bEl.textContent = bCaptures.length > 0
+            ? bCaptures.map(p => PIECE_UNICODE.w[p]).join(' ')
+            : '—';
+    }
+
+    function updateInvalidCounts() {
+        document.getElementById('white-invalid').textContent = invalidMoves.w;
+        document.getElementById('black-invalid').textContent = invalidMoves.b;
+    }
+
+    function updateThoughtBubble(color, text) {
+        const id = color === 'w' ? 'white-thought' : 'black-thought';
+        const el = document.getElementById(id);
+        el.textContent = text || '—';
+        el.classList.add('visible');
+    }
+
+    function updateConfidence(color, value) {
+        const prefix = color === 'w' ? 'white' : 'black';
+        const valueEl = document.getElementById(`${prefix}-confidence`);
+        const fillEl = document.getElementById(`${prefix}-confidence-fill`);
+
+        if (value === null || value === undefined) {
+            valueEl.textContent = '—';
+            valueEl.className = 'confidence-value';
+            fillEl.style.width = '0%';
+            confidence[color] = null;
+            return;
+        }
+
+        const clamped = Math.max(0, Math.min(100, Math.round(value)));
+        confidence[color] = clamped;
+        valueEl.textContent = `${clamped}%`;
+
+        // Color-code the value
+        valueEl.className = 'confidence-value';
+        if (clamped >= 65) valueEl.classList.add('high');
+        else if (clamped >= 35) valueEl.classList.add('mid');
+        else valueEl.classList.add('low');
+
+        fillEl.style.width = `${clamped}%`;
+    }
+
+    function estimateConfidence(color) {
+        // Heuristic fallback: estimate confidence from material balance
+        const board = game.board();
+        let material = { w: 0, b: 0 };
+        const values = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                const cell = board[row][col];
+                if (cell) material[cell.color] += values[cell.type] || 0;
+            }
+        }
+
+        // Calculate advantage as a percentage (50 = even)
+        const total = material.w + material.b;
+        if (total === 0) return 50;
+        const myMaterial = material[color];
+        const ratio = myMaterial / total;
+        // Scale: 0.5 ratio = 50%, skewed towards edges
+        let conf = Math.round(ratio * 100);
+        // Clamp to 15-95 range (never fully certain or hopeless)
+        return Math.max(15, Math.min(95, conf));
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // GAME RESULT
+    // ────────────────────────────────────────────────────────────────────────────
+    function showGameResult() {
+        let icon = '🏁';
+        let title = 'Game Over';
+        let detail = '';
+
+        if (game.in_checkmate()) {
+            // The current turn is the one who is checkmated
+            const loser = game.turn() === 'w' ? 'White' : 'Black';
+            const winner = game.turn() === 'w' ? 'Black' : 'White';
+            icon = '👑';
+            title = `Checkmate — ${winner} Wins!`;
+            detail = `${loser} has been checkmated. ${winner} triumphs!`;
+            setStatus(`♛ Checkmate! ${winner} wins!`, 'checkmate');
+        } else if (game.in_stalemate()) {
+            icon = '🤝';
+            title = 'Stalemate';
+            detail = 'Neither side can make a legal move. The game is a draw.';
+            setStatus('Stalemate — Draw');
+        } else if (game.in_threefold_repetition()) {
+            icon = '🔄';
+            title = 'Draw by Repetition';
+            detail = 'The same position has occurred three times.';
+            setStatus('Draw by threefold repetition');
+        } else if (game.insufficient_material()) {
+            icon = '⚖️';
+            title = 'Draw — Insufficient Material';
+            detail = 'Neither side has enough material to deliver checkmate.';
+            setStatus('Draw — insufficient material');
+        } else if (game.in_draw()) {
+            icon = '🤝';
+            title = 'Draw';
+            detail = 'The game has ended in a draw (50-move rule or other).';
+            setStatus('Draw');
+        }
+
+        document.getElementById('result-icon').textContent = icon;
+        document.getElementById('result-title').textContent = title;
+        document.getElementById('result-detail').textContent = detail;
+
+        // Small delay for dramatic effect
+        setTimeout(() => {
+            document.getElementById('result-overlay').classList.add('visible');
+        }, 600);
+
+        document.getElementById('btn-start').disabled = false;
+        document.getElementById('btn-pause').disabled = true;
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // KEYBOARD SHORTCUT (Enter to save API key)
+    // ────────────────────────────────────────────────────────────────────────────
+    document.getElementById('api-key-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveApiKey();
+    });
+
+    </script>
+</body>
+</html>
